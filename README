@@ -1,0 +1,37 @@
+# What is m2odic?
+
+Multi-Monitor OSX Desktop Image Changer.  It's verbose, but descriptive
+
+# How do I use it?
+
+Easy answer?  Drop it into a directory full of images you want to use as backgrounds, and run it.
+
+# What are the requirements?
+
+* OSX ( I mean, do I even have to say that? )
+* Ruby
+* RubyGems
+* plist gem
+* rubyosa gem
+
+# I get a weird "Bus" error?
+
+Yeah.  I bet you're using rubyosa 0.4.0?  It's broken.
+
+Make sure you have the libxml-ruby gem installed, version 0.3.8.4.  You can have others, that one just has to be present.
+
+Fire up a text edit and open "/Library/Ruby/Gems/1.8/gems/rubyosa-0.4.0/lib/rbosa.rb".
+
+Replace the line
+
+  require 'xml/libxml'
+
+with
+
+  gem 'xml/libxml', '= 0.3.8.4'
+  
+and you _should_ be fine.
+
+# Can I have the images be mirrored?
+
+Yes.  Instructions to come soon.  Honest.

@@ -1,11 +1,16 @@
 #!/usr/bin/env ruby
 
-require 'rmagick'
 require 'rubygems'
+require 'rmagick'
 require 'plist'
 require 'rbosa'
 require 'yaml'
 require 'fileutils'
+require 'pathname'
+require 'tempfile'
+require 'logger'
+
+logger = Logger.new(STDOUT)
 
 def to_plist( fpath, cts = nil )
   if cts
@@ -36,22 +41,50 @@ def generate_mirrored( img )
   out
 end
 
-if( ARGV.include?("--gui") )
-
-  exit 0
+def generate_identifier( key )
+  baseout = "/tmp/m2odic-id-#{key}.gif"
+  image_list = Magick::ImageList.new
+  image_list.new_image( 640, 480 ) do
+    self.background_color = "#999999"
+  end
+  
+  text = Magick::Draw.new
+  text.font_family = "arial"
+  text.pointsize = 52
+  text.gravity = Magick::CenterGravity
+  text.annotate(image_list, 0, 0, 0, 0, key) do
+    self.fill = "#ffffff"
+  end
+  
+  image_list.write( baseout)
+  baseout
 end
 
-logfile = File.join( File.dirname(__FILE__), '.change_desktop.log')
+config = {
+  :logfile => File.join( File.dirname(__FILE__), '.m2odic.log'),
+  :base_bgs => File.dirname(__FILE__),
+  :preferences => File.join( Pathname.new("~").expand_path.to_s, "/Library/Preferences/com.apple.desktop.plist" ),
+  :normal_display => nil,
+  :mirror => false
+}
+
+rc_file = File.join( Pathname.new("~").expand_path.to_s, ".m2odic-rc" )
+
+if File.exists?( rc_file )
+  logger.debug "Found config file"
+  config.merge!( YAML.load( File.read( rc_file ) ) )
+end
+
+
 log = []
-if File.exists?( logfile )
-  log = YAML.load( File.read(logfile) )
+if File.exists?( config[:logfile] )
+  log = YAML.load( File.read(config[:logfile]) )
 end
 
-base_bgs = "/Users/jmoses/Pictures/Desktop Backgrounds/interfacelift/"
 
 new_path = ""
 pictures = []
-Dir["#{base_bgs}/*"].each do |pic|
+Dir["#{config[:base_bgs]}/*"].each do |pic|
   next if File.directory?(pic)
   pictures << pic
 end
@@ -61,23 +94,30 @@ if pictures.all? {|pic| log.include?(pic) }
 else
   pictures = pictures.reject {|pic| log.include?(pic) }
 end
-puts "Picking 1 background out of #{pictures.size}"
+logger.info "Picking 1 background out of #{pictures.size}"
 new_path = pictures[ rand(pictures.size) ]
-fname = "/Users/jmoses/Library/Preferences/com.apple.desktop.plist"
-# new_path = "/Users/jmoses/Pictures/Desktop Backgrounds/interfacelift/01540_driftwood_1440x900.jpg"
 
-data = Plist::parse_xml( to_xml( fname ) )
 
-mirror = generate_mirrored(new_path)
+data = Plist::parse_xml( to_xml( config[:preferences] ) )
+
+if config[:mirror]
+  mirror = generate_mirrored(new_path)
+end
 
 data["Background"].each_pair do |key,val|
-  if key != '69671424'
+  next if key == 'default'
+  
+  if key != config[:normal_display].to_s and config[:mirror]
     path = mirror
   else
     path = new_path
   end
   
-  puts "Using #{path} for #{key}"
+  if ARGV.include?("identify")
+    path = generate_identifier(key)
+  end
+  
+  logger.info "Using #{path} for #{key}"
   
   # puts "Current paths for #{key}"
   # puts val["ImageFilePath"]
@@ -86,11 +126,12 @@ data["Background"].each_pair do |key,val|
   val["NewImageFilePath"] = path
 end
 
-to_plist(fname, data.to_plist)
+to_plist(config[:preferences], data.to_plist)
 
 ## Force reload of desktop backgrounds.  Yeah!
 finder = OSA.app("Finder")
 finder.desktop_picture = finder.desktop_picture
 
-log << new_path
-File.open(logfile, 'w') {|out| out << log.to_yaml }
+log << new_path unless ARGV.include?("identify")
+
+File.open(config[:logfile], 'w') {|out| out << log.to_yaml }
