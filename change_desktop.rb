@@ -3,7 +3,7 @@
 require 'rubygems'
 require 'rmagick'
 require 'plist'
-require 'rbosa'
+require 'appscript'
 require 'yaml'
 require 'fileutils'
 require 'pathname'
@@ -129,8 +129,8 @@ end
 to_plist(config[:preferences], data.to_plist)
 
 ## Force reload of desktop backgrounds.  Yeah!
-finder = OSA.app("Finder")
-finder.desktop_picture = finder.desktop_picture
+finder = Appscript.app("Finder")
+finder.desktop_picture.set(finder.desktop_picture)
 
 log << new_path unless ARGV.include?("identify")
 
