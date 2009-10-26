@@ -37,8 +37,39 @@ def generate_mirrored( img )
   
   image = Magick::Image.read( img ).first
   image.flop!
+
+  add_opaque_border(image)
   image.write( out )
   out
+end
+
+def generate_bordered( img )
+  baseout = File.join( File.dirname(img), '.bordered')
+  out = File.join( baseout, File.basename(img) )
+  unless File.exists?(baseout)
+    FileUtils.mkdir( baseout )
+  end
+  
+  image = Magick::Image.read( img ).first
+  add_opaque_border(image)
+  image.write( out )
+  out  
+end
+
+def add_opaque_border( image )
+  overlay_height = 130
+  border_height = 3
+  
+  overlay = Magick::Image.new( image.columns, overlay_height ) {
+    self.background_color = "rgba(0,0,0,0.35)"
+  }
+  overlay_border = Magick::Image.new( image.columns, border_height ) {
+    self.background_color = "rgba(0,0,0,0,0.45)"
+  }
+  
+  image.composite!( overlay, Magick::NorthGravity, Magick::MultiplyCompositeOp )
+  image.composite!( overlay_border, 0, overlay_height, Magick::MultiplyCompositeOp)
+
 end
 
 def generate_identifier( key )
@@ -104,13 +135,15 @@ if config[:mirror]
   mirror = generate_mirrored(new_path)
 end
 
+bordered = generate_bordered(new_path)
+
 data["Background"].each_pair do |key,val|
   next if key == 'default'
   
   if key != config[:normal_display].to_s and config[:mirror]
     path = mirror
   else
-    path = new_path
+    path = bordered
   end
   
   if ARGV.include?("identify")
